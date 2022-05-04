@@ -1,7 +1,7 @@
 use proc_macro;
-use proc_macro2::{self, TokenStream};
+use proc_macro2::{self, TokenStream, Ident};
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data, DataEnum};
+use syn::{parse_macro_input, DeriveInput, Data, DataEnum, Variant};
 
 #[proc_macro_derive(Fsm)]
 pub fn derive_fsm(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -29,13 +29,19 @@ pub fn derive_fsm(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 fn gen(input: &DeriveInput) -> TokenStream {
     let enum_name = &input.ident;
     if let Data::Enum(DataEnum {ref variants, ..}) = input.data {
-        let l: Vec<String> = variants.iter().map(|x| x.ident.to_string()).collect();
-        let text = l.join(", ");
+        let y: Vec<&Ident> = variants
+            .iter()
+            .map(|x| &x.ident)
+            .collect();
+
         quote! {
             fn bla(&self) -> String {
-                let a = vec![#(#l),*];
-                a.join(", ")
-                //"bla"
+                let a = vec![#(::std::stringify!(#y)),*];
+                let b = match &self {
+                    #(#enum_name::#y =>
+                      ::std::stringify!(#y)),*
+                };
+                ::std::string::String::from(b)
             }
         }
     } else {
