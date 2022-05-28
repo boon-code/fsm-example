@@ -1,11 +1,19 @@
 use proc_macro;
 use proc_macro2::{self, TokenStream, Ident};
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data, DataEnum, Variant};
+use syn::{self, DeriveInput, Data, DataEnum, Variant};
 
 #[proc_macro_derive(Fsm)]
 pub fn derive_fsm(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
+    proc_macro::TokenStream::from(
+        main_fsm(
+            TokenStream::from(input)
+        )
+    )
+}
+
+fn main_fsm(input: TokenStream) -> TokenStream {
+    let input: DeriveInput = syn::parse2(input).unwrap();
     let name = &input.ident;
     let name_str = name.to_string();
 
@@ -23,7 +31,7 @@ pub fn derive_fsm(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
     };
 
-    proc_macro::TokenStream::from(out)
+    out
 }
 
 fn gen(input: &DeriveInput) -> TokenStream {
@@ -46,5 +54,46 @@ fn gen(input: &DeriveInput) -> TokenStream {
         }
     } else {
         panic!("not an enum");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simple_good_case() {
+        let input = quote! {
+            enum Test {
+                A,
+                B,
+                C,
+            }
+        };
+        let _ = main_fsm(input);
+    }
+
+    #[test]
+    fn complex_enums() {
+        let input = quote! {
+            enum Test {
+                A(u32),
+                B,
+                C {name: String, age: u32},
+            }
+        };
+        let _ = main_fsm(input);
+    }
+
+    #[test]
+    #[should_panic(expected = "not an enum")]
+    fn test_panic_on_struct() {
+        let input = quote! {
+            struct Test {
+                name: String,
+                age: u32,
+            }
+        };
+        let _ = main_fsm(input);
     }
 }
