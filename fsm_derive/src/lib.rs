@@ -1,7 +1,7 @@
 use proc_macro;
 use proc_macro2::{self, TokenStream, Ident};
-use quote::quote;
-use syn::{self, DeriveInput, Data, DataEnum, Variant};
+use quote::{quote, quote_spanned};
+use syn::{self, DeriveInput, Data, DataEnum, Fields, Variant, spanned::Spanned};
 
 #[proc_macro_derive(Fsm)]
 pub fn derive_fsm(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -17,11 +17,10 @@ fn main_fsm(input: TokenStream) -> TokenStream {
     let name = &input.ident;
     let name_str = name.to_string();
 
-    let imp_tok: TokenStream = "use std::string::String;".parse().unwrap();
     let e = gen(&input);
 
     let out: TokenStream = quote! {
-        #imp_tok
+        #[automatically_derived]
         impl #name {
             #e
 
@@ -41,12 +40,33 @@ fn gen(input: &DeriveInput) -> TokenStream {
             .iter()
             .map(|x| &x.ident)
             .collect();
+        let z: Vec<TokenStream> = variants
+            .iter()
+            .map(|x| {
+                match &x.fields {
+                    Fields::Unnamed(_) => {
+                        quote_spanned! {
+                            x.span()=> (..)
+                        }
+                    },
+                    Fields::Unit => {
+                        quote_spanned! {
+                            x.span() =>
+                        }
+                    },
+                    Fields::Named(_) => {
+                        quote_spanned! {
+                            x.span()=> {..}
+                        }
+                    },
+                }
+            })
+            .collect();
 
         quote! {
             fn bla(&self) -> String {
-                let a = vec![#(::std::stringify!(#y)),*];
                 let b = match &self {
-                    #(#enum_name::#y =>
+                    #(#enum_name::#y #z =>
                       ::std::stringify!(#y)),*
                 };
                 ::std::string::String::from(b)
@@ -68,6 +88,19 @@ mod tests {
                 A,
                 B,
                 C,
+            }
+        };
+        let _ = main_fsm(input);
+    }
+
+
+    #[test]
+    fn complex_enums2() {
+        let input = quote! {
+            enum Test2 {
+                A(u32, u32, i8),
+                B,
+                C {name: String, age: u32},
             }
         };
         let _ = main_fsm(input);
